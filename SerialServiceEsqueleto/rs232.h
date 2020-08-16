@@ -29,19 +29,16 @@
 ***************************************************************************
 */
 
-
-
 #ifndef rs232_INCLUDED
 #define rs232_INCLUDED
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include <stdio.h>
 #include <string.h>
-
-
 
 #ifdef __linux__
 
@@ -53,8 +50,8 @@ extern "C" {
 #include <sys/stat.h>
 #include <limits.h>
 
-int setRTS(int comport_number, int level);
-int setDTR(int comport_number, int level);
+    int setRTS(int comport_number, int level);
+    int setDTR(int comport_number, int level);
 
 #else
 
@@ -62,19 +59,16 @@ int setDTR(int comport_number, int level);
 
 #endif
 
-int OpenComport(int, int);
-int PollComport(int, unsigned char *, int);
-int SendByte(int, unsigned char);
-int SendBuf(int, unsigned char *, int);
-void CloseComport(int);
-void cprintf(int, const char *);
-int IsCTSEnabled(int);
-
+    int OpenComport(int, int);
+    int PollComport(int, unsigned char *, int);
+    int SendByte(int, unsigned char);
+    int SendBuf(int, unsigned char *, int);
+    void CloseComport(int);
+    void cprintf(int, const char *);
+    int IsCTSEnabled(int);
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
 #endif
-
-
