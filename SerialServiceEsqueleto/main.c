@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "SerialManager.h"
 #include "UserSignals.h"
 #include <string.h>
@@ -17,16 +18,27 @@ void *thread_usb(void *nothing);
 int main(void)
 {
 	void *usb_ret;
+	int thread_usb_created;
+
 	signals_init();
 	signals_thread_disable();
-	pthread_create(&usb, NULL, thread_usb, NULL);
-	signals_thread_enable();
-	printf("Running..\r\n");
-	pthread_join(usb, &usb_ret);
-	printf("\r\nExit succesful\r\n");
+	thread_usb_created = pthread_create(&usb, NULL, thread_usb, NULL);
+	if (thread_usb_created != 0)
+	{
+		errno = thread_usb_created;
+		perror("pthread_create");
+		return -1;
+	}
+	else
+	{
+		signals_thread_enable();
+		printf("Running..\r\n");
+		pthread_join(usb, &usb_ret);
+		printf("\r\nExit succesful\r\n");
 
-	exit(EXIT_SUCCESS);
-	return 0;
+		exit(EXIT_SUCCESS);
+		return 0;
+	}
 }
 
 void *thread_usb(void *nothing)
