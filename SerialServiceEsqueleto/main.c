@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #define msToUs(x) (x * 1000U)
+#define END_STRING '\0'
 
 int main(void)
 {
@@ -21,7 +22,7 @@ int main(void)
 		usleep(msToUs(50));
 
 		strncpy(echo_terminal, mainPort.buffer, mainPort.bytesReaded);
-		echo_terminal[mainPort.bytesReaded] = '\0';
+		echo_terminal[mainPort.bytesReaded] = END_STRING;
 
 		if (mainPort.bytesReaded > 0)
 		{
