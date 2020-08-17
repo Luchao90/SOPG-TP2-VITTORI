@@ -1,4 +1,13 @@
+#define BUFFER_LENGTH 20
 
+typedef struct
+{
+    int32_t file;
+    char buffer[BUFFER_LENGTH];
+    int number;
+    int baudrate;
+    int bytesReaded;
+} SerialPort;
 
 int serial_open(int pn, int baudrate);
 void serial_send(char *pData, int size);
