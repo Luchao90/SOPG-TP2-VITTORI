@@ -108,8 +108,10 @@ void *thread_usb(void *nothing)
 
 void *thread_tcp(void *nothing)
 {
-	int sockfd, connfd, len;
-	struct sockaddr_in serveraddr, clientaddr;
+	int sockfd, newfd;
+	socklen_t len;
+	struct sockaddr_in serveraddr;
+	struct sockaddr_in clientaddr;
 	char buff[BUFFER_LENGTH];
 	int n;
 
@@ -120,7 +122,7 @@ void *thread_tcp(void *nothing)
 	if (sockfd == -1)
 	{
 		console_print("socket creation failed...\n");
-		exit(0);
+		pthread_exit(NULL);
 	}
 	else
 	{
@@ -134,74 +136,65 @@ void *thread_tcp(void *nothing)
 	if (inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr)) <= 0)
 	{
 		console_print("ERROR invalid server IP\r\n");
-		return NULL;
+		pthread_exit(NULL);
 	}
 
 	// Binding newly created socket to given IP and verification
 	if ((bind(sockfd, (SA *)&serveraddr, sizeof(serveraddr))) != 0)
 	{
+		close(sockfd);
 		console_print("socket bind failed...\n");
-		exit(0);
-	}
-	else
-	{
-		console_print("Socket successfully binded..\n");
+		pthread_exit(NULL);
 	}
 
 	// Now server is ready to listen and verification
-	if ((listen(sockfd, 5)) != 0)
+	if ((listen(sockfd, 10)) != 0)
 	{
 		console_print("Listen failed...\n");
-		exit(0);
+		pthread_exit(NULL);
 	}
 	else
 	{
-		console_print("Server listening..\n");
+		console_print("TCP listening..\n");
 	}
 
-	len = sizeof(clientaddr);
-	// Accept the data packet from client and verification
-	connfd = accept(sockfd, (SA *)&clientaddr, &len);
-	if (connfd < 0)
-	{
-		console_print("server acccept failed...\n");
-		exit(0);
-	}
-	else
-	{
-		console_print("server acccept the client...\n");
-	}
-
-	// infinite loop for chat
 	while (1)
 	{
-		bzero(buff, BUFFER_LENGTH);
-
-		// read the message from client and copy it in buffer
-		read(sockfd, buff, sizeof(buff));
-		// print buffer which contains the client contents
-		pthread_mutex_lock(&console.mutex);
-		printf("From client: %s\t To client : ", buff);
-		pthread_mutex_unlock(&console.mutex);
-		bzero(buff, BUFFER_LENGTH);
-		n = 0;
-		// copy server message in the buffer
-		while ((buff[n++] = getchar()) != '\n')
-			;
-
-		// and send that buffer to client
-		/* write(sockfd, buff, sizeof(buff)); */
-
-		// if msg contains "Exit" then server exit and chat ended.
-		if (strncmp("exit", buff, 4) == 0)
+		len = sizeof(clientaddr);
+		// Accept the data packet from client and verification
+		newfd = accept(sockfd, (SA *)&clientaddr, &len);
+		if (newfd < 0)
 		{
-			console_print("Server Exit...\n");
-			break;
+			console_print("server acccept failed...\n");
+			exit(1);
 		}
-	}
 
-	// After chatting close the socket
-	close(sockfd);
+		char ipClient[32];
+		inet_ntop(AF_INET, &(clientaddr.sin_addr), ipClient, sizeof(ipClient));
+		pthread_mutex_lock(&console.mutex);
+		printf("server:  conexion desde:  %s\n", ipClient);
+		pthread_mutex_unlock(&console.mutex);
+
+		bzero(buff, BUFFER_LENGTH);
+
+		while (1)
+		{
+			if ((n = read(newfd, buff, sizeof(buff))) == -1)
+			{
+				console_print("Error leyendo mensaje en socket\r\n");
+				exit(1);
+			}
+			buff[n] = END_STRING;
+			pthread_mutex_lock(&console.mutex);
+			printf("Interace service: %s", buff);
+			pthread_mutex_unlock(&console.mutex);
+
+			/* Request to client */
+			/* write(sockfd, buff, sizeof(buff)); */
+		}
+		close(sockfd);
+		sleep(1);
+	}
 	return NULL;
 }
 
