@@ -11,8 +11,17 @@
 #define msToUs(x) (x * 1000U)
 #define END_STRING '\0'
 
-pthread_t usb, tcp;
+typedef struct
+{
+	pthread_mutex_t mutex;
+	char echo[BUFFER_LENGTH];
+} Terminal_t;
 
+Terminal_t console = {
+	.mutex = PTHREAD_MUTEX_INITIALIZER,
+	.echo[0] = END_STRING};
+
+pthread_t usb, tcp;
 void *thread_usb(void *nothing);
 
 int main(void)
@@ -43,8 +52,12 @@ int main(void)
 
 void *thread_usb(void *nothing)
 {
-	SerialPort mainPort = {.file = 0, .buffer = ">OUTS:2,2,2,2\r\n", .number = 1, .baudrate = 115200, .bytesReaded = 0};
-	char echo_terminal[BUFFER_LENGTH];
+	SerialPort mainPort = {
+		.file = 0,
+		.buffer = ">OUTS:2,2,2,2\r\n",
+		.number = 1,
+		.baudrate = 115200,
+		.bytesReaded = 0};
 
 	printf("thread USB\r\n");
 	mainPort.file = serial_open(mainPort.number, mainPort.baudrate);
@@ -55,13 +68,14 @@ void *thread_usb(void *nothing)
 		mainPort.bytesReaded = serial_receive(mainPort.buffer, BUFFER_LENGTH);
 		usleep(msToUs(50));
 
-		strncpy(echo_terminal, mainPort.buffer, mainPort.bytesReaded);
-		echo_terminal[mainPort.bytesReaded] = END_STRING;
-
+		pthread_mutex_lock(&console.mutex);
+		strncpy(console.echo, mainPort.buffer, mainPort.bytesReaded);
+		console.echo[mainPort.bytesReaded] = END_STRING;
 		if (mainPort.bytesReaded > 0)
 		{
-			printf("RX: %s", echo_terminal);
+			printf("RX: %s", console.echo);
 		}
+		pthread_mutex_unlock(&console.mutex);
 	}
 	return NULL;
 }
