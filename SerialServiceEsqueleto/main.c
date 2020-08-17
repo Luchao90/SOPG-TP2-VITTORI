@@ -4,10 +4,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#define msToUs (x)
-
+#define msToUs(x) (x * 1000U)
 #define BUFFER_LENGTH 20
-#define MILLISECONDS_100 (100 * 1000U)
 
 typedef struct
 {
@@ -16,6 +14,8 @@ typedef struct
 	int number;
 	int baudrate;
 } SerialPort;
+
+void edu_ciaa_read(void);
 
 int main(void)
 {
@@ -30,7 +30,7 @@ int main(void)
 	while (1)
 	{
 		bytes_length = serial_receive(mainPort.buffer, BUFFER_LENGTH);
-		usleep(MILLISECONDS_100);
+		usleep(msToUs(50));
 
 		strncpy(echo_terminal, mainPort.buffer, bytes_length);
 		echo_terminal[bytes_length] = '\0';
