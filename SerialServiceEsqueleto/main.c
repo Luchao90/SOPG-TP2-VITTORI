@@ -83,9 +83,7 @@ int main(void)
 	else
 	{
 		signals_thread_enable();
-		pthread_mutex_lock(&console.mutex);
-		printf("thread main\r\n");
-		pthread_mutex_unlock(&console.mutex);
+		console_print("thread main\r\n");
 		pthread_join(usb, NULL);
 		pthread_join(tcp, NULL);
 		printf("\r\nExit succesful\r\n");
@@ -97,12 +95,10 @@ int main(void)
 
 void *thread_usb(void *nothing)
 {
-	pthread_mutex_lock(&console.mutex);
-	printf("thread USB\r\n");
-	pthread_mutex_unlock(&console.mutex);
-
+	console_print("thread USB\r\n");
+	pthread_mutex_lock(&mainPort.mutex);
 	mainPort.file = serial_open(mainPort.number, mainPort.baudrate);
-	serial_send(mainPort.buffer, strlen(mainPort.buffer));
+	pthread_mutex_unlock(&mainPort.mutex);
 
 	while (1)
 	{
@@ -117,7 +113,7 @@ void *thread_usb(void *nothing)
 		if (mainPort.bytesReaded > 0)
 		{
 			pthread_mutex_lock(&console.mutex);
-			printf("RX: %s", console.echo);
+			printf("EDU-CIAA: %s", console.echo);
 			pthread_mutex_unlock(&console.mutex);
 		}
 	}
