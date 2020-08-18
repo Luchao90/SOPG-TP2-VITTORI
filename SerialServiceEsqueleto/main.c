@@ -144,15 +144,17 @@ void *thread_usb(void *nothing)
 				sprintf(tcp.buff_tx, ":LINE%cTG\n", usb.buffer[LINE_X_CHANGE_POSITION]);
 				pthread_mutex_unlock(&tcp.mutex);
 
-				/* console echo */
-				pthread_mutex_lock(&console.mutex);
-				printf("Send to socket: %s", tcp.buff_tx);
-				pthread_mutex_unlock(&console.mutex);
-
 				//Escribo por el socket
 				if (write(tcp.newfd, tcp.buff_tx, sizeof(tcp.buff_tx)) == -1)
 				{
 					console_print("No socket connection, waiting for new\r\n");
+				}
+				else
+				{
+					/* console echo */
+					pthread_mutex_lock(&console.mutex);
+					printf("Send to socket: %s", tcp.buff_tx);
+					pthread_mutex_unlock(&console.mutex);
 				}
 			}
 		}
@@ -255,7 +257,7 @@ void *thread_tcp(void *nothing)
 				serial_send(usb.buffer, sizeof(usb.buffer));
 				pthread_mutex_unlock(&usb.mutex);
 
-			    pthread_mutex_lock(&console.mutex);
+				pthread_mutex_lock(&console.mutex);
 				printf("USB-TX: %s", usb.buffer);
 				pthread_mutex_unlock(&console.mutex);
 			}
