@@ -91,7 +91,9 @@ void *thread_usb(void *nothing)
 	while (1)
 	{
 		/* Send blinky option to edu ciaa */
+		pthread_mutex_lock(&mainPort.mutex);
 		mainPort.bytesReaded = serial_receive(mainPort.buffer, BUFFER_LENGTH);
+		pthread_mutex_unlock(&mainPort.mutex);
 		usleep(msToUs(50));
 
 		pthread_mutex_lock(&console.mutex);
@@ -182,18 +184,28 @@ void *thread_tcp(void *nothing)
 			if ((n = read(newfd, buff, sizeof(buff))) == -1)
 			{
 				console_print("Error leyendo mensaje en socket\r\n");
-				exit(1);
+				return NULL;
 			}
+
+			if (n == 0)
+			{
+				return NULL;
+			}
+
 			buff[n] = END_STRING;
 			pthread_mutex_lock(&console.mutex);
 			printf("Interace service: %s", buff);
 			pthread_mutex_unlock(&console.mutex);
 
+			pthread_mutex_lock(&mainPort.mutex);
+			//Creacion del string para enviar por la UART
+			sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", buff[7], buff[8], buff[9], buff[10]);
+			serial_send(mainPort.buffer, sizeof(mainPort.buffer));
+			pthread_mutex_unlock(&mainPort.mutex);
+
 			/* Request to client */
 			/* write(sockfd, buff, sizeof(buff)); */
 		}
-		close(sockfd);
-		sleep(1);
 	}
 	return NULL;
 }
