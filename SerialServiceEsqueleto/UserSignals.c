@@ -11,19 +11,19 @@
 
 #include "UserSignals.h"
 
-extern pthread_t usb, tcp;
 struct sigaction SigTerm;
 struct sigaction SigInt;
 static void signals_handler(int sig);
 
 void signals_init(void)
 {
+  user_signal = 0;
   SigTerm.sa_handler = signals_handler;
-  SigTerm.sa_flags = 0;
+  SigTerm.sa_flags = SA_RESTART;
   sigemptyset(&SigTerm.sa_mask);
 
   SigInt.sa_handler = signals_handler;
-  SigInt.sa_flags = 0;
+  SigInt.sa_flags = SA_RESTART;
   sigemptyset(&SigInt.sa_mask);
 
   /* Map handlers for user signals */
@@ -50,6 +50,5 @@ void signals_thread_enable(void)
 
 static void signals_handler(int sig)
 {
-  pthread_cancel(usb);
-  pthread_cancel(tcp);
+  user_signal = EXIT_SIGNAL;
 }

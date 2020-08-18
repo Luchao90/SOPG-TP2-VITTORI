@@ -1,4 +1,3 @@
-#include <pthread.h>
 #define BUFFER_LENGTH 20
 
 typedef struct

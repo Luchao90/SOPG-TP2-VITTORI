@@ -12,8 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <signal.h>
+
+#define EXIT_SIGNAL 1
+
+volatile sig_atomic_t user_signal;
 
 void signals_init(void);
 void signals_thread_disable(void);
