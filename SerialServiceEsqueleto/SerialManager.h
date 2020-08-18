@@ -1,7 +1,9 @@
+#include <pthread.h>
 #define BUFFER_LENGTH 20
 
 typedef struct
 {
+    pthread_mutex_t mutex;
     int32_t file;
     char buffer[BUFFER_LENGTH];
     int number;

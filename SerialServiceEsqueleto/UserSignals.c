@@ -11,8 +11,9 @@
 
 #include "UserSignals.h"
 
-extern pthread_t usb;
-
+extern pthread_t usb, tcp;
+struct sigaction SigTerm;
+struct sigaction SigInt;
 static void signals_handler(int sig);
 
 void signals_init(void)
@@ -50,4 +51,5 @@ void signals_thread_enable(void)
 static void signals_handler(int sig)
 {
   pthread_cancel(usb);
+  pthread_cancel(tcp);
 }

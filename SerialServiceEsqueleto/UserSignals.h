@@ -15,9 +15,6 @@
 #include <pthread.h>
 #include <signal.h>
 
-struct sigaction SigTerm;
-struct sigaction SigInt;
-
 void signals_init(void);
 void signals_thread_disable(void);
 void signals_thread_enable(void);
