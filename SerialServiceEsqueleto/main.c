@@ -44,6 +44,7 @@ typedef struct
 	struct sockaddr_in serveraddr;
 	struct sockaddr_in clientaddr;
 	char buff[BUFFER_LENGTH];
+	char buff_tx[BUFFER_LENGTH];
 	int n;
 	char ipClient[32];
 } Socket_t;
@@ -132,6 +133,28 @@ void *thread_usb(void *nothing)
 			pthread_mutex_lock(&console.mutex);
 			printf("EDU-CIAA: %s", console.echo);
 			pthread_mutex_unlock(&console.mutex);
+
+			if (strncmp(mainPort.buffer, ">OK\r\n", strlen(">OK\r\n")) != 0)
+			{
+				//Creacion del buffer para enviar por el socket
+				pthread_mutex_lock(&mysocket.mutex);
+				sprintf(mysocket.buff_tx, ":LINE%cTG\n", mainPort.buffer[14]);
+				pthread_mutex_unlock(&mysocket.mutex);
+
+				pthread_mutex_lock(&console.mutex);
+				printf("Envio por el socket: %s", mysocket.buff_tx);
+				pthread_mutex_unlock(&console.mutex);
+
+				if (mysocket.connection != CONNECTION_LOST)
+				{
+					//Escribo por el socket
+					if (write(mysocket.newfd, mysocket.buff_tx, strlen(mysocket.buff_tx)) == -1)
+					{
+						perror("Error escribiendo mensaje en el socket\r\n");
+						exit(1);
+					}
+				}
+			}
 		}
 	}
 	pthread_exit(NULL);
