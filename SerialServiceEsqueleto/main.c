@@ -109,17 +109,17 @@ void *thread_usb(void *nothing)
 		/* Send blinky option to edu ciaa */
 		pthread_mutex_lock(&mainPort.mutex);
 		mainPort.bytesReaded = serial_receive(mainPort.buffer, BUFFER_LENGTH);
+		strncpy(console.echo, mainPort.buffer, mainPort.bytesReaded);
+		console.echo[mainPort.bytesReaded] = END_STRING;
 		pthread_mutex_unlock(&mainPort.mutex);
 		usleep(msToUs(50));
 
-		pthread_mutex_lock(&console.mutex);
-		strncpy(console.echo, mainPort.buffer, mainPort.bytesReaded);
-		console.echo[mainPort.bytesReaded] = END_STRING;
 		if (mainPort.bytesReaded > 0)
 		{
+			pthread_mutex_lock(&console.mutex);
 			printf("RX: %s", console.echo);
+			pthread_mutex_unlock(&console.mutex);
 		}
-		pthread_mutex_unlock(&console.mutex);
 	}
 	return NULL;
 }
