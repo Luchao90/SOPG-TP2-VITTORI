@@ -17,6 +17,8 @@
 #define END_STRING '\0'
 #define PORT 10000
 #define SA struct sockaddr
+#define CONNECTION_LOST -1
+#define PAYLOAD_LENGTH sizeof(":STATESXYWZ") //:STATESXYWZ
 
 typedef struct
 {
@@ -31,6 +33,7 @@ Terminal_t console = {
 typedef struct
 {
 	pthread_mutex_t mutex;
+	int connection;
 	int sockfd;
 	int newfd;
 	socklen_t len;
@@ -38,11 +41,12 @@ typedef struct
 	struct sockaddr_in clientaddr;
 	char buff[BUFFER_LENGTH];
 	int n;
+	char ipClient[32];
 } Socket_t;
 
 Socket_t mysocket = {
 	.mutex = PTHREAD_MUTEX_INITIALIZER,
-};
+	.connection = CONNECTION_LOST};
 
 void console_print(const char *string);
 
@@ -67,7 +71,7 @@ int main(void)
 	signals_thread_disable();
 	thread_usb_created = pthread_create(&usb, NULL, thread_usb, NULL);
 	thread_tcp_created = pthread_create(&tcp, NULL, thread_tcp, NULL);
-	
+
 	if (thread_usb_created != 0)
 	{
 		errno = thread_usb_created;
@@ -84,7 +88,7 @@ int main(void)
 	{
 		signals_thread_enable();
 		console_print("thread main\r\n");
-		while(user_signal != EXIT_SIGNAL)
+		while (user_signal != EXIT_SIGNAL)
 		{
 			sleep(1);
 		}
@@ -137,12 +141,12 @@ void *thread_tcp(void *nothing)
 	mysocket.sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (mysocket.sockfd == -1)
 	{
-		console_print("Socket creation failed...\n");
+		console_print("Socket creation failed...\r\n");
 		pthread_exit(NULL);
 	}
 	else
 	{
-		console_print("Socket successfully created..\n");
+		console_print("Socket successfully created..\r\n");
 	}
 	/* assign IP, PORT  */
 	bzero(&mysocket.serveraddr, sizeof(mysocket.serveraddr));
@@ -158,20 +162,19 @@ void *thread_tcp(void *nothing)
 	// Binding newly created socket to given IP and verification
 	if ((bind(mysocket.sockfd, (SA *)&mysocket.serveraddr, sizeof(mysocket.serveraddr))) != 0)
 	{
-		close(mysocket.sockfd);
-		console_print("Socket bind failed...\n");
+		console_print("Socket bind failed...\r\n");
 		pthread_exit(NULL);
 	}
 
 	// Now server is ready to listen and verification
 	if ((listen(mysocket.sockfd, 10)) != 0)
 	{
-		console_print("Listen failed...\n");
+		console_print("Listen failed...\r\n");
 		pthread_exit(NULL);
 	}
 	else
 	{
-		console_print("TCP listening..\n");
+		console_print("TCP listening..\r\n");
 	}
 
 	while (1)
@@ -181,42 +184,45 @@ void *thread_tcp(void *nothing)
 		mysocket.newfd = accept(mysocket.sockfd, (SA *)&mysocket.clientaddr, &mysocket.len);
 		if (mysocket.newfd < 0)
 		{
-			console_print("server acccept failed...\n");
+			console_print("Server acccept failed...\r\n");
 			pthread_exit(NULL);
 		}
 
-		char ipClient[32];
-		inet_ntop(AF_INET, &(mysocket.clientaddr.sin_addr), ipClient, sizeof(ipClient));
+		inet_ntop(AF_INET, &(mysocket.clientaddr.sin_addr), mysocket.ipClient, sizeof(mysocket.ipClient));
 		pthread_mutex_lock(&console.mutex);
-		printf("server:  conexion desde:  %s\n", ipClient);
+		printf("Server connection from:  %s\r\n", mysocket.ipClient);
 		pthread_mutex_unlock(&console.mutex);
+		mysocket.connection = 1;
 
-		while (1)
+		while (mysocket.connection != CONNECTION_LOST)
 		{
-			bzero(mysocket.buff, BUFFER_LENGTH);
 			if ((mysocket.n = read(mysocket.newfd, mysocket.buff, sizeof(mysocket.buff))) == -1)
 			{
 				console_print("Error leyendo mensaje en socket\r\n");
-				break;
+				pthread_exit(NULL);
 			}
-
 			if (mysocket.n == 0)
 			{
-				break;
+				mysocket.connection = CONNECTION_LOST;
+				close(mysocket.newfd);
+				console_print("Connection lost, try again\r\n");
 			}
 
-			mysocket.buff[mysocket.n] = END_STRING;
-			pthread_mutex_lock(&console.mutex);
-			printf("Interace service: %s", mysocket.buff);
-			pthread_mutex_unlock(&console.mutex);
+			if (mysocket.n >= PAYLOAD_LENGTH)
+			{
+				mysocket.buff[mysocket.n] = END_STRING;
+				pthread_mutex_lock(&console.mutex);
+				printf("Interace service: %s", mysocket.buff);
+				pthread_mutex_unlock(&console.mutex);
 
-			pthread_mutex_lock(&mainPort.mutex);
-			sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", mysocket.buff[7], mysocket.buff[8], mysocket.buff[9], mysocket.buff[10]);
-			serial_send(mainPort.buffer, sizeof(mainPort.buffer));
-			pthread_mutex_unlock(&mainPort.mutex);
+				pthread_mutex_lock(&mainPort.mutex);
+				sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", mysocket.buff[7], mysocket.buff[8], mysocket.buff[9], mysocket.buff[10]);
+				serial_send(mainPort.buffer, sizeof(mainPort.buffer));
+				pthread_mutex_unlock(&mainPort.mutex);
+			}
 		}
+		sleep(1);
 	}
-	//close(mysocket.sockfd);
 	pthread_exit(NULL);
 }
 
