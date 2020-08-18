@@ -28,6 +28,22 @@ Terminal_t console = {
 	.mutex = PTHREAD_MUTEX_INITIALIZER,
 	.echo[0] = END_STRING};
 
+typedef struct
+{
+	pthread_mutex_t mutex;
+	int sockfd;
+	int newfd;
+	socklen_t len;
+	struct sockaddr_in serveraddr;
+	struct sockaddr_in clientaddr;
+	char buff[BUFFER_LENGTH];
+	int n;
+} Socket_t;
+
+Socket_t mysocket = {
+	.mutex = PTHREAD_MUTEX_INITIALIZER,
+};
+
 void console_print(const char *string);
 
 SerialPort mainPort = {
@@ -110,18 +126,11 @@ void *thread_usb(void *nothing)
 
 void *thread_tcp(void *nothing)
 {
-	int sockfd, newfd;
-	socklen_t len;
-	struct sockaddr_in serveraddr;
-	struct sockaddr_in clientaddr;
-	char buff[BUFFER_LENGTH];
-	int n;
-
 	console_print("thread TCP\r\n");
 
 	/* Create socket */
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd == -1)
+	mysocket.sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (mysocket.sockfd == -1)
 	{
 		console_print("socket creation failed...\n");
 		pthread_exit(NULL);
@@ -131,26 +140,26 @@ void *thread_tcp(void *nothing)
 		console_print("Socket successfully created..\n");
 	}
 	/* assign IP, PORT  */
-	bzero(&serveraddr, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_port = htons(PORT);
-	//serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	if (inet_pton(AF_INET, "127.0.0.1", &(serveraddr.sin_addr)) <= 0)
+	bzero(&mysocket.serveraddr, sizeof(mysocket.serveraddr));
+	mysocket.serveraddr.sin_family = AF_INET;
+	mysocket.serveraddr.sin_port = htons(PORT);
+	//mysocket.serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	if (inet_pton(AF_INET, "127.0.0.1", &(mysocket.serveraddr.sin_addr)) <= 0)
 	{
 		console_print("ERROR invalid server IP\r\n");
 		pthread_exit(NULL);
 	}
 
 	// Binding newly created socket to given IP and verification
-	if ((bind(sockfd, (SA *)&serveraddr, sizeof(serveraddr))) != 0)
+	if ((bind(mysocket.sockfd, (SA *)&mysocket.serveraddr, sizeof(mysocket.serveraddr))) != 0)
 	{
-		close(sockfd);
+		close(mysocket.sockfd);
 		console_print("socket bind failed...\n");
 		pthread_exit(NULL);
 	}
 
 	// Now server is ready to listen and verification
-	if ((listen(sockfd, 10)) != 0)
+	if ((listen(mysocket.sockfd, 10)) != 0)
 	{
 		console_print("Listen failed...\n");
 		pthread_exit(NULL);
@@ -162,49 +171,49 @@ void *thread_tcp(void *nothing)
 
 	while (1)
 	{
-		len = sizeof(clientaddr);
+		mysocket.len = sizeof(mysocket.clientaddr);
 		// Accept the data packet from client and verification
-		newfd = accept(sockfd, (SA *)&clientaddr, &len);
-		if (newfd < 0)
+		mysocket.newfd = accept(mysocket.sockfd, (SA *)&mysocket.clientaddr, &mysocket.len);
+		if (mysocket.newfd < 0)
 		{
 			console_print("server acccept failed...\n");
 			exit(1);
 		}
 
 		char ipClient[32];
-		inet_ntop(AF_INET, &(clientaddr.sin_addr), ipClient, sizeof(ipClient));
+		inet_ntop(AF_INET, &(mysocket.clientaddr.sin_addr), ipClient, sizeof(ipClient));
 		pthread_mutex_lock(&console.mutex);
 		printf("server:  conexion desde:  %s\n", ipClient);
 		pthread_mutex_unlock(&console.mutex);
 
-		bzero(buff, BUFFER_LENGTH);
+		bzero(mysocket.buff, BUFFER_LENGTH);
 
 		while (1)
 		{
-			if ((n = read(newfd, buff, sizeof(buff))) == -1)
+			if ((mysocket.n = read(mysocket.newfd, mysocket.buff, sizeof(mysocket.buff))) == -1)
 			{
 				console_print("Error leyendo mensaje en socket\r\n");
 				return NULL;
 			}
 
-			if (n == 0)
+			if (mysocket.n == 0)
 			{
 				return NULL;
 			}
 
-			buff[n] = END_STRING;
+			mysocket.buff[mysocket.n] = END_STRING;
 			pthread_mutex_lock(&console.mutex);
-			printf("Interace service: %s", buff);
+			printf("Interace service: %s", mysocket.buff);
 			pthread_mutex_unlock(&console.mutex);
 
 			pthread_mutex_lock(&mainPort.mutex);
 			//Creacion del string para enviar por la UART
-			sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", buff[7], buff[8], buff[9], buff[10]);
+			sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", mysocket.buff[7], mysocket.buff[8], mysocket.buff[9], mysocket.buff[10]);
 			serial_send(mainPort.buffer, sizeof(mainPort.buffer));
 			pthread_mutex_unlock(&mainPort.mutex);
 
 			/* Request to client */
-			/* write(sockfd, buff, sizeof(buff)); */
+			/* write(mysocket.sockfd, buff, sizeof(buff)); */
 		}
 	}
 	return NULL;
