@@ -19,6 +19,10 @@
 #define SA struct sockaddr
 #define CONNECTION_LOST -1
 #define PAYLOAD_LENGTH sizeof(":STATESXYWZ") //:STATESXYWZ
+#define LINE_A_STATE_POSITION 7
+#define LINE_B_STATE_POSITION 8
+#define LINE_C_STATE_POSITION 9
+#define LINE_D_STATE_POSITION 10
 
 typedef struct
 {
@@ -135,6 +139,8 @@ void *thread_usb(void *nothing)
 
 void *thread_tcp(void *nothing)
 {
+	char line_A_state, line_B_state, line_C_state, line_D_state;
+
 	console_print("thread TCP\r\n");
 
 	/* Create socket */
@@ -205,18 +211,23 @@ void *thread_tcp(void *nothing)
 			{
 				mysocket.connection = CONNECTION_LOST;
 				close(mysocket.newfd);
-				console_print("Connection lost, try again\r\n");
+				console_print("Connection lost, waiting for new\r\n");
 			}
 
 			if (mysocket.n >= PAYLOAD_LENGTH)
 			{
 				mysocket.buff[mysocket.n] = END_STRING;
+				line_A_state = mysocket.buff[LINE_A_STATE_POSITION];
+				line_B_state = mysocket.buff[LINE_B_STATE_POSITION];
+				line_C_state = mysocket.buff[LINE_C_STATE_POSITION];
+				line_D_state = mysocket.buff[LINE_D_STATE_POSITION];
+
 				pthread_mutex_lock(&console.mutex);
 				printf("Interace service: %s", mysocket.buff);
 				pthread_mutex_unlock(&console.mutex);
 
 				pthread_mutex_lock(&mainPort.mutex);
-				sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", mysocket.buff[7], mysocket.buff[8], mysocket.buff[9], mysocket.buff[10]);
+				sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", line_A_state, line_B_state, line_C_state, line_D_state);
 				serial_send(mainPort.buffer, sizeof(mainPort.buffer));
 				pthread_mutex_unlock(&mainPort.mutex);
 			}
