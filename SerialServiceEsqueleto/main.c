@@ -60,14 +60,14 @@ void *thread_tcp(void *nothing);
 
 int main(void)
 {
-	void *usb_ret;
 	int thread_usb_created;
 	int thread_tcp_created;
 
 	signals_init();
 	signals_thread_disable();
 	thread_usb_created = pthread_create(&usb, NULL, thread_usb, NULL);
-	thread_tcp_created = pthread_create(&usb, NULL, thread_tcp, NULL);
+	thread_tcp_created = pthread_create(&tcp, NULL, thread_tcp, NULL);
+	
 	if (thread_usb_created != 0)
 	{
 		errno = thread_usb_created;
@@ -84,9 +84,18 @@ int main(void)
 	{
 		signals_thread_enable();
 		console_print("thread main\r\n");
+		while(user_signal != EXIT_SIGNAL)
+		{
+			sleep(1);
+		}
+		pthread_cancel(usb);
+		pthread_cancel(tcp);
 		pthread_join(usb, NULL);
 		pthread_join(tcp, NULL);
-		printf("\r\nExit succesful\r\n");
+		serial_close();
+		close(mysocket.sockfd);
+		close(mysocket.newfd);
+		printf("\r\nExit program\r\n");
 
 		exit(EXIT_SUCCESS);
 		return 0;
@@ -96,13 +105,13 @@ int main(void)
 void *thread_usb(void *nothing)
 {
 	console_print("thread USB\r\n");
+
 	pthread_mutex_lock(&mainPort.mutex);
 	mainPort.file = serial_open(mainPort.number, mainPort.baudrate);
 	pthread_mutex_unlock(&mainPort.mutex);
 
 	while (1)
 	{
-		/* Send blinky option to edu ciaa */
 		pthread_mutex_lock(&mainPort.mutex);
 		mainPort.bytesReaded = serial_receive(mainPort.buffer, BUFFER_LENGTH);
 		strncpy(console.echo, mainPort.buffer, mainPort.bytesReaded);
@@ -117,7 +126,7 @@ void *thread_usb(void *nothing)
 			pthread_mutex_unlock(&console.mutex);
 		}
 	}
-	return NULL;
+	pthread_exit(NULL);
 }
 
 void *thread_tcp(void *nothing)
@@ -128,7 +137,7 @@ void *thread_tcp(void *nothing)
 	mysocket.sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (mysocket.sockfd == -1)
 	{
-		console_print("socket creation failed...\n");
+		console_print("Socket creation failed...\n");
 		pthread_exit(NULL);
 	}
 	else
@@ -150,7 +159,7 @@ void *thread_tcp(void *nothing)
 	if ((bind(mysocket.sockfd, (SA *)&mysocket.serveraddr, sizeof(mysocket.serveraddr))) != 0)
 	{
 		close(mysocket.sockfd);
-		console_print("socket bind failed...\n");
+		console_print("Socket bind failed...\n");
 		pthread_exit(NULL);
 	}
 
@@ -173,7 +182,7 @@ void *thread_tcp(void *nothing)
 		if (mysocket.newfd < 0)
 		{
 			console_print("server acccept failed...\n");
-			exit(1);
+			pthread_exit(NULL);
 		}
 
 		char ipClient[32];
@@ -182,19 +191,18 @@ void *thread_tcp(void *nothing)
 		printf("server:  conexion desde:  %s\n", ipClient);
 		pthread_mutex_unlock(&console.mutex);
 
-		bzero(mysocket.buff, BUFFER_LENGTH);
-
 		while (1)
 		{
+			bzero(mysocket.buff, BUFFER_LENGTH);
 			if ((mysocket.n = read(mysocket.newfd, mysocket.buff, sizeof(mysocket.buff))) == -1)
 			{
 				console_print("Error leyendo mensaje en socket\r\n");
-				return NULL;
+				break;
 			}
 
 			if (mysocket.n == 0)
 			{
-				return NULL;
+				break;
 			}
 
 			mysocket.buff[mysocket.n] = END_STRING;
@@ -203,16 +211,13 @@ void *thread_tcp(void *nothing)
 			pthread_mutex_unlock(&console.mutex);
 
 			pthread_mutex_lock(&mainPort.mutex);
-			//Creacion del string para enviar por la UART
 			sprintf(mainPort.buffer, ">OUTS:%c,%c,%c,%c\r\n", mysocket.buff[7], mysocket.buff[8], mysocket.buff[9], mysocket.buff[10]);
 			serial_send(mainPort.buffer, sizeof(mainPort.buffer));
 			pthread_mutex_unlock(&mainPort.mutex);
-
-			/* Request to client */
-			/* write(mysocket.sockfd, buff, sizeof(buff)); */
 		}
 	}
-	return NULL;
+	//close(mysocket.sockfd);
+	pthread_exit(NULL);
 }
 
 void console_print(const char *string)
